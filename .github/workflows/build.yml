@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Stable Desktop Matrix
+  # Job 1: Desktop Matrix (Keeps building your rock-solid green binaries)
   desktop-release:
     name: Build Installer for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -31,7 +31,7 @@ jobs:
           target/release/ultra_share
           target/release/ultra_share.exe
 
-  # Job 2: Android Native Compilation Layer
+  # Job 2: Complete Modern Flutter + Rust Integration Engine
   android-release:
     name: Build Android APK (Flutter + Rust)
     runs-on: ubuntu-latest
@@ -45,35 +45,36 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
+    - name: Set Up Rust & Android Targets
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
+
     - name: Set Up Flutter Framework
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
 
-    - name: Install Android Cargo Cross-Compiler Tools
-      run: |
-        rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-        cargo install cargo-ndk
+    - name: Install Modern Bridge Codegen Tools
+      run: cargo install flutter_rust_bridge_codegen
 
-    - name: Generate Frontend Architecture Template
+    - name: Generate and Auto-Integrate Project Architecture
       run: |
+        # 1. Create a clean root flutter wrapper layer
         flutter create mobile_frontend --platforms=android
+        
+        # 2. Let the codegen tool link the directories and auto-configure build.gradle
         cd mobile_frontend
-        echo "  flutter_rust_bridge: ^1.82.6" >> pubspec.yaml
+        flutter_rust_bridge_codegen integrate
+        
+        # 3. Add the camera module scanning dependencies to the new stack
         echo "  mobile_scanner: ^5.0.0" >> pubspec.yaml
         flutter pub get
 
-    - name: Install Code Generator and Synchronize Bridge
-      run: |
-        cargo install flutter_rust_bridge_codegen --version 1.82.6
-        flutter_rust_bridge_codegen \
-          --rust-input src/api.rs \
-          --dart-output mobile_frontend/lib/bridge_generated.dart \
-          --dart-decl-output mobile_frontend/lib/bridge_definitions.dart
-
-    - name: Compile Native C-Bindings and Build Production APK
+    - name: Generate Code Bindings and Build Release Package
       run: |
         cd mobile_frontend
+        flutter_rust_bridge_codegen generate
         flutter build apk --release
 
     - name: Upload Finished Android Installer
