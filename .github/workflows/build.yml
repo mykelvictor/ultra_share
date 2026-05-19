@@ -50,6 +50,12 @@ jobs:
       with:
         channel: 'stable'
 
+    # Universal Generator Step: Creates all missing gradle & android manifest files
+    - name: Reconstruct Native Android Project Files
+      run: |
+        cd ultra_share_app
+        flutter create . --platforms=android
+
     - name: Fetch Flutter App Dependencies
       run: |
         cd ultra_share_app
