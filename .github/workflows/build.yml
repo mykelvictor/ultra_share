@@ -5,7 +5,6 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Compiles Desktop Executables
   desktop-release:
     name: Build Installer for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -30,59 +29,4 @@ jobs:
         path: |
           target/release/ultra_share
           target/release/ultra_share.exe
-
-  # Job 2: Compiles the Android App with the Embedded Rust Engine
-  android-release:
-    name: Build Android APK (Flutter + Rust)
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Set Up Java Environment
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
-
-    - name: Set Up Rust & Android NDK Targets
-      uses: dtolnay/rust-toolchain@stable
-      with:
-      targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
-
-    - name: Set Up Flutter Framework
-      uses: subosito/flutter-action@v2
-      with:
-        channel: 'stable'
-
-    - name: Install Flutter Rust Bridge Generator Tool
-      run: cargo install flutter_rust_bridge_codegen --version 1.82.6
-
-    - name: Reconstruct Native Android Project Files
-      run: |
-        cd ultra_share_app
-        flutter create . --platforms=android
-
-    - name: Run Bridge Code Generation Pipeline
-      run: |
-        flutter_rust_bridge_codegen \
-          --rust-input src/api.rs \
-          --dart-output ultra_share_app/lib/bridge_generated.dart \
-          --dart-decl-output ultra_share_app/lib/bridge_definitions.dart
-
-    - name: Fetch Flutter App Dependencies
-      run: |
-        cd ultra_share_app
-        flutter pub get
-
-    - name: Compile Release APK
-      run: |
-        cd ultra_share_app
-        flutter build apk --release
-
-    - name: Upload Finished Android Installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: ultra-share-android-apk
-        path: ultra_share_app/build/app/outputs/flutter-apk/app-release.apk
 
