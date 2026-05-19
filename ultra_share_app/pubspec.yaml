@@ -17,3 +17,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  flutter_rust_bridge: ^1.82.6

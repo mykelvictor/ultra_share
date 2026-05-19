@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Compiles Desktop Executables (Windows, Mac, Linux)
+  # Job 1: Compiles Desktop Executables
   desktop-release:
     name: Build Installer for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -31,9 +31,9 @@ jobs:
           target/release/ultra_share
           target/release/ultra_share.exe
 
-  # Job 2: Compiles the Android Mobile App Visual Interface
+  # Job 2: Compiles the Android App with the Embedded Rust Engine
   android-release:
-    name: Build Android APK (Flutter)
+    name: Build Android APK (Flutter + Rust)
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Code
@@ -45,16 +45,30 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
+    - name: Set Up Rust & Android NDK Targets
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android, armv7-linux-andronef, i686-linux-android, x86_64-linux-android
+
     - name: Set Up Flutter Framework
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
 
-    # Universal Generator Step: Creates all missing gradle & android manifest files
+    - name: Install Flutter Rust Bridge Generator Tool
+      run: cargo install flutter_rust_bridge_codegen --version 1.82.6
+
     - name: Reconstruct Native Android Project Files
       run: |
         cd ultra_share_app
         flutter create . --platforms=android
+
+    - name: Run Bridge Code Generation Pipeline
+      run: |
+        flutter_rust_bridge_codegen \
+          --rust-input src/api.rs \
+          --dart-output ultra_share_app/lib/bridge_generated.dart \
+          --dart-decl-output ultra_share_app/lib/bridge_definitions.dart
 
     - name: Fetch Flutter App Dependencies
       run: |

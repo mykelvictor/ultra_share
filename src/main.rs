@@ -5,6 +5,7 @@ use qrcode::render::unicode;
 mod protocol;
 mod sender;
 mod receiver;
+mod api;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
