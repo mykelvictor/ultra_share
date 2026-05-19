@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Desktop Compilation Matrix (Unchanged and Green)
+  # Job 1: Stable Desktop Matrix
   desktop-release:
     name: Build Installer for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -31,7 +31,7 @@ jobs:
           target/release/ultra_share
           target/release/ultra_share.exe
 
-  # Job 2: Complete Android Packaging Layer
+  # Job 2: Android Native Compilation Layer
   android-release:
     name: Build Android APK (Flutter + Rust)
     runs-on: ubuntu-latest
@@ -45,38 +45,35 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
 
-    - name: Set Up Rust & Android Targets
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
-
     - name: Set Up Flutter Framework
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
 
-    - name: Install Bridge Tools & Generate App Template
+    - name: Install Android Cargo Cross-Compiler Tools
       run: |
-        cargo install flutter_rust_bridge_codegen --version 1.82.6
+        rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+        cargo install cargo-ndk
+
+    - name: Generate Frontend Architecture Template
+      run: |
         flutter create mobile_frontend --platforms=android
-        
-    - name: Inject Bridge Dependencies into Mobile Template
-      run: |
         cd mobile_frontend
         echo "  flutter_rust_bridge: ^1.82.6" >> pubspec.yaml
         echo "  mobile_scanner: ^5.0.0" >> pubspec.yaml
+        flutter pub get
 
-    - name: Run Cloud Bridge Code Generation
+    - name: Install Code Generator and Synchronize Bridge
       run: |
+        cargo install flutter_rust_bridge_codegen --version 1.82.6
         flutter_rust_bridge_codegen \
           --rust-input src/api.rs \
           --dart-output mobile_frontend/lib/bridge_generated.dart \
           --dart-decl-output mobile_frontend/lib/bridge_definitions.dart
 
-    - name: Build Production Android APK
+    - name: Compile Native C-Bindings and Build Production APK
       run: |
         cd mobile_frontend
-        flutter pub get
         flutter build apk --release
 
     - name: Upload Finished Android Installer
