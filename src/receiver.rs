@@ -1,7 +1,7 @@
 use tokio::net::TcpListener;
 use tokio::io::AsyncReadExt;
 use std::fs::{self, OpenOptions};
-use std::os::unix::fs::FileExt;
+use std::io::{Write, Seek, SeekFrom};
 
 pub async fn run_receiver(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
@@ -50,9 +50,10 @@ pub async fn run_receiver(port: u16) -> Result<(), Box<dyn std::error::Error>> {
                 let target_len = chunk_size as usize;
                 socket.read_exact(&mut chunk_buffer[..target_len]).await?;
                 
-                // Direct high-speed write to the targeted storage layer offset bounds
-                let target_file = &open_files[file_index as usize];
-                target_file.write_all_at(&chunk_buffer[..target_len], offset)?;
+                // Universal cross-platform high-speed write (Works on Windows, Mac, & Linux)
+                let mut target_file = &open_files[file_index as usize];
+                target_file.seek(SeekFrom::Start(offset))?;
+                target_file.write_all(&chunk_buffer[..target_len])?;
             }
             crate::protocol::PacketHeader::TransferComplete => {
                 println!("✓ Transfer finished! Folder successfully assembled natively.");
