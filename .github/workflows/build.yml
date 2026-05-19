@@ -5,7 +5,8 @@ on:
     branches: [ main ]
 
 jobs:
-  release:
+  # Job 1: Compiles Desktop Executables (Windows, Mac, Linux)
+  desktop-release:
     name: Build Installer for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -29,3 +30,39 @@ jobs:
         path: |
           target/release/ultra_share
           target/release/ultra_share.exe
+
+  # Job 2: Compiles the Android Mobile App Visual Interface
+  android-release:
+    name: Build Android APK (Flutter)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set Up Java Environment
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Set Up Flutter Framework
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    - name: Fetch Flutter App Dependencies
+      run: |
+        cd ultra_share_app
+        flutter pub get
+
+    - name: Compile Release APK
+      run: |
+        cd ultra_share_app
+        flutter build apk --release
+
+    - name: Upload Finished Android Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultra-share-android-apk
+        path: ultra_share_app/build/app/outputs/flutter-apk/app-release.apk
+
