@@ -1,0 +1,31 @@
+name: Cross-Platform Build Factory
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  release:
+    name: Build Installer for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set Up Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Compile Optimized Binary
+      run: cargo build --release
+
+    - name: Upload Finished Executable Asset
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultra-share-${{ matrix.os }}
+        path: |
+          target/release/ultra_share
+          target/release/ultra_share.exe
