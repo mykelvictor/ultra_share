@@ -76,16 +76,18 @@ jobs:
       with:
         channel: 'stable'
 
+    - name: Generate Core Platform Bindings First
+      run: |
+        cd mobile_frontend
+        # Initialize platform directories before modifying asset contents
+        flutter create . --platforms=android
+        mkdir -p assets/bin/
+
     - name: Pull Compiled Rust Engine Into Mobile Assets Folder
       uses: actions/download-artifact@v4
       with:
         name: rust-android-binary
         path: mobile_frontend/assets/bin/
-
-    - name: Generate Core Platform Bindings
-      run: |
-        cd mobile_frontend
-        flutter create . --platforms=android
 
     - name: Build Production Release Package
       run: |
