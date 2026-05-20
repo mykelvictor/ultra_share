@@ -5,7 +5,33 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Build the fast Rust Engine for Android
+  # Job 1: High-Performance Desktop Matrix (Windows, Mac, Linux)
+  desktop-release:
+    name: Build Installer for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set Up Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Compile Optimized Binary
+      run: cargo build --release
+
+    - name: Upload Finished Executable Asset
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultra-share-${{ matrix.os }}
+        path: |
+          target/release/ultra_share
+          target/release/ultra_share.exe
+
+  # Job 2: Build the High-Speed Rust Engine for Android
   build-rust-android:
     name: Build Android Rust Core
     runs-on: ubuntu-latest
@@ -30,7 +56,7 @@ jobs:
         name: rust-android-binary
         path: target/aarch64-linux-android/release/ultra_share
 
-  # Job 2: Build the clean Android App Installer Bundle
+  # Job 3: Build the Clean Android App Installer Bundle
   android-apk:
     name: Package Android APK
     needs: build-rust-android
@@ -59,7 +85,6 @@ jobs:
     - name: Generate Core Platform Bindings
       run: |
         cd mobile_frontend
-        # This configures missing platform configurations safely inside the runner
         flutter create . --platforms=android
 
     - name: Build Production Release Package
