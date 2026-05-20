@@ -5,33 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Stable Desktop Matrix (Windows, Mac, Linux)
-  desktop-release:
-    name: Build Installer for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Set Up Rust Toolchain
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Compile Optimized Binary
-      run: cargo build --release
-
-    - name: Upload Finished Executable Asset
-      uses: actions/upload-artifact@v4
-      with:
-        name: ultra-share-${{ matrix.os }}
-        path: |
-          target/release/ultra_share
-          target/release/ultra_share.exe
-
-  # Job 2: Build the high-speed Rust Core for Mobile
+  # Job 1: Build the fast Rust Engine for Android
   build-rust-android:
     name: Build Android Rust Core
     runs-on: ubuntu-latest
@@ -44,7 +18,7 @@ jobs:
       with:
         targets: aarch64-linux-android
 
-    - name: Install Android Cross-Compiler
+    - name: Install Android Cross-Compiler Tool
       run: cargo install cargo-ndk
 
     - name: Compile Optimized Mobile Engine
@@ -56,7 +30,7 @@ jobs:
         name: rust-android-binary
         path: target/aarch64-linux-android/release/ultra_share
 
-  # Job 3: Generate Frontend Interface and Package APK
+  # Job 2: Build the clean Android App Installer Bundle
   android-apk:
     name: Package Android APK
     needs: build-rust-android
@@ -76,68 +50,21 @@ jobs:
       with:
         channel: 'stable'
 
-    - name: Generate Project Framework and Native Assets Folder
-      run: |
-        flutter create mobile_frontend --platforms=android
-        cd mobile_frontend
-        mkdir -p assets/bin/
-
-    - name: Pull Compiled Rust Engine Into Mobile Assets
+    - name: Pull Compiled Rust Engine Into Mobile Assets Folder
       uses: actions/download-artifact@v4
       with:
         name: rust-android-binary
         path: mobile_frontend/assets/bin/
 
-    - name: Inject Complete Interface and Build APK
+    - name: Generate Core Platform Bindings
       run: |
         cd mobile_frontend
-        
-        # 1. Update the app configuration to bundle our background engine asset
-        echo -e "\nflutter:\n  assets:\n    - assets/bin/ultra_share" >> pubspec.yaml
-        
-        # 2. Write a minimal main interface logic that runs our engine cleanly
-        cat << 'EOF' > lib/main.dart
-        import 'dart:io';
-        import 'package:flutter/material.dart';
-        import 'package:flutter/services.dart';
+        # This configures missing platform configurations safely inside the runner
+        flutter create . --platforms=android
 
-        void main() => runApp(const MaterialApp(home: UltraShareApp()));
-
-        class UltraShareApp extends StatelessWidget {
-          const UltraShareApp({super.key});
-
-          Future<void> launchRustEngine() async {
-            try {
-              // Extract the high-speed executable out of our bundle assets onto mobile storage
-              final byteData = await rootBundle.load('assets/bin/ultra_share');
-              final file = File('${Directory.systemTemp.path}/ultra_share');
-              await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
-              
-              // Grant permission and boot up the sharing sockets in the background!
-              await Process.run('chmod', ['+x', file.path]);
-              await Process.start(file.path, ['receive', '8080']);
-              print("UltraShare Engine is actively running!");
-            } catch (e) {
-              print("Failed to launch background engine: $e");
-            }
-          }
-
-          @override
-          Widget build(BuildContext context) {
-            return Scaffold(
-              appBar: AppBar(title: const Text('UltraShare Mobile')),
-              body: Center(
-                child: ElevatedButton(
-                  onPressed: launchRustEngine,
-                  child: const Text('Initialize High-Speed Storage Engine'),
-                ),
-              ),
-            );
-          }
-        }
-        EOF
-
-        # 3. Compile everything down to a single production app installer
+    - name: Build Production Release Package
+      run: |
+        cd mobile_frontend
         flutter pub get
         flutter build apk --release
 
