@@ -5,23 +5,49 @@ on:
     branches: [ main ]
 
 jobs:
-  # Job 1: Build the fast Rust Engine for Android
-  build-rust-engine:
+  # Job 1: Stable Desktop Matrix (Windows, Mac, Linux)
+  desktop-release:
+    name: Build Installer for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set Up Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Compile Optimized Binary
+      run: cargo build --release
+
+    - name: Upload Finished Executable Asset
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultra-share-${{ matrix.os }}
+        path: |
+          target/release/ultra_share
+          target/release/ultra_share.exe
+
+  # Job 2: Build the high-speed Rust Core for Mobile
+  build-rust-android:
     name: Build Android Rust Core
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Set Up Rust
+    - name: Set Up Rust Target Toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: aarch64-linux-android
 
-    - name: Install Android NDK Linker
+    - name: Install Android Cross-Compiler
       run: cargo install cargo-ndk
 
-    - name: Compile High-Speed Engine
+    - name: Compile Optimized Mobile Engine
       run: cargo ndk -t arm64-v8a build --release
 
     - name: Share Binary Artifact
@@ -30,10 +56,10 @@ jobs:
         name: rust-android-binary
         path: target/aarch64-linux-android/release/ultra_share
 
-  # Job 2: Package the Android Application
+  # Job 3: Generate Frontend Interface and Package APK
   android-apk:
-    name: Build Visual APK
-    needs: build-rust-engine
+    name: Package Android APK
+    needs: build-rust-android
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Code
@@ -50,36 +76,74 @@ jobs:
       with:
         channel: 'stable'
 
-    - name: Dynamically Build and Configure Frontend Template
+    - name: Generate Project Framework and Native Assets Folder
       run: |
-        # Generate the frontend project layer entirely in the cloud environment
         flutter create mobile_frontend --platforms=android
         cd mobile_frontend
-        
-        # Create the asset subfolders safely
         mkdir -p assets/bin/
-        
-        # Inject the scanner plugin configuration
-        echo "  mobile_scanner: ^5.0.0" >> pubspec.yaml
 
-    - name: Download Rust Binary Core into Asset Layer
+    - name: Pull Compiled Rust Engine Into Mobile Assets
       uses: actions/download-artifact@v4
       with:
         name: rust-android-binary
         path: mobile_frontend/assets/bin/
 
-    - name: Finalize Configuration and Build Package
+    - name: Inject Complete Interface and Build APK
       run: |
         cd mobile_frontend
-        # Explicitly append the assets registration block to pubspec.yaml
+        
+        # 1. Update the app configuration to bundle our background engine asset
         echo -e "\nflutter:\n  assets:\n    - assets/bin/ultra_share" >> pubspec.yaml
         
+        # 2. Write a minimal main interface logic that runs our engine cleanly
+        cat << 'EOF' > lib/main.dart
+        import 'dart:io';
+        import 'package:flutter/material.dart';
+        import 'package:flutter/services.dart';
+
+        void main() => runApp(const MaterialApp(home: UltraShareApp()));
+
+        class UltraShareApp extends StatelessWidget {
+          const UltraShareApp({super.key});
+
+          Future<void> launchRustEngine() async {
+            try {
+              // Extract the high-speed executable out of our bundle assets onto mobile storage
+              final byteData = await rootBundle.load('assets/bin/ultra_share');
+              final file = File('${Directory.systemTemp.path}/ultra_share');
+              await file.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+              
+              // Grant permission and boot up the sharing sockets in the background!
+              await Process.run('chmod', ['+x', file.path]);
+              await Process.start(file.path, ['receive', '8080']);
+              print("UltraShare Engine is actively running!");
+            } catch (e) {
+              print("Failed to launch background engine: $e");
+            }
+          }
+
+          @override
+          Widget build(BuildContext context) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('UltraShare Mobile')),
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: launchRustEngine,
+                  child: const Text('Initialize High-Speed Storage Engine'),
+                ),
+              ),
+            );
+          }
+        }
+        EOF
+
+        # 3. Compile everything down to a single production app installer
         flutter pub get
         flutter build apk --release
 
     - name: Upload Finished Android Installer
       uses: actions/upload-artifact@v4
       with:
-        name: ultra-share-app
+        name: ultra-share-android-apk
         path: mobile_frontend/build/app/outputs/flutter-apk/app-release.apk
 
